@@ -16,11 +16,18 @@ class ChatService {
     this.sessionId = crypto.randomUUID();
     this.baseUrl = `/api/chat/${this.sessionId}`;
   }
+  private ensureBaseUrl() {
+    if (!this.sessionId) {
+      this.sessionId = crypto.randomUUID();
+    }
+    this.baseUrl = `/api/chat/${this.sessionId}`;
+  }
   async sendMessage(
     message: string,
     model?: string,
     onChunk?: (chunk: string) => void
   ): Promise<ChatResponse> {
+    this.ensureBaseUrl();
     try {
       const response = await fetch(`${this.baseUrl}/chat`, {
         method: 'POST',
@@ -28,8 +35,6 @@ class ChatService {
         body: JSON.stringify({ message, model, stream: !!onChunk }),
       });
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`Chat error (HTTP ${response.status}):`, errorText);
         throw new Error(`HTTP ${response.status}`);
       }
       if (onChunk && response.body) {
@@ -40,47 +45,37 @@ class ChatService {
             const { done, value } = await reader.read();
             if (done) break;
             const chunk = decoder.decode(value, { stream: true });
-            if (chunk) {
-              onChunk(chunk);
-            }
+            if (chunk) onChunk(chunk);
           }
         } finally {
           reader.releaseLock();
         }
         return { success: true };
       }
-      const data = await response.json();
-      return data;
+      return await response.json();
     } catch (error) {
       console.error('Failed to send message:', error);
-      return { success: false, error: 'Network error or service unavailable' };
+      return { success: false, error: 'Service unavailable' };
     }
   }
   async getMessages(): Promise<ChatResponse> {
+    this.ensureBaseUrl();
     try {
       const response = await fetch(`${this.baseUrl}/messages`);
-      if (!response.ok) {
-        console.error(`Failed to fetch messages: HTTP ${response.status}`);
-        throw new Error(`HTTP ${response.status}`);
-      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return await response.json();
     } catch (error) {
       console.error('Failed to get messages:', error);
-      return { success: false, error: 'Failed to load consultation history' };
+      return { success: false, error: 'Failed to load history' };
     }
   }
   async clearMessages(): Promise<ChatResponse> {
+    this.ensureBaseUrl();
     try {
-      const response = await fetch(`${this.baseUrl}/clear`, {
-        method: 'DELETE'
-      });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
+      const response = await fetch(`${this.baseUrl}/clear`, { method: 'DELETE' });
       return await response.json();
     } catch (error) {
-      console.error('Failed to clear messages:', error);
-      return { success: false, error: 'Failed to clear session data' };
+      return { success: false, error: 'Failed to clear session' };
     }
   }
   getSessionId(): string {
@@ -94,111 +89,62 @@ class ChatService {
     this.sessionId = sessionId;
     this.baseUrl = `/api/chat/${sessionId}`;
   }
-  // Session Management Methods
-  async createSession(title?: string, sessionId?: string, firstMessage?: string): Promise<{ success: boolean; data?: { sessionId: string; title: string }; error?: string }> {
+  async createSession(title?: string, sessionId?: string, firstMessage?: string) {
     try {
       const response = await fetch('/api/sessions', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title, sessionId, firstMessage })
       });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return await response.json();
     } catch (error) {
-      console.error('Session creation failed:', error);
-      return { success: false, error: 'Failed to create session' };
+      return { success: false, error: 'Session creation failed' };
     }
   }
   async listSessions(): Promise<{ success: boolean; data?: SessionInfo[]; error?: string }> {
     try {
       const response = await fetch('/api/sessions');
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      const data = await response.json();
-      return data;
+      return await response.json();
     } catch (error) {
-      console.error('List sessions failed:', error);
-      return { success: false, error: 'Failed to list previous consultations' };
+      return { success: false, error: 'List sessions failed' };
     }
   }
-  async deleteSession(sessionId: string): Promise<{ success: boolean; error?: string }> {
+  async deleteSession(sessionId: string) {
     try {
       const response = await fetch(`/api/sessions/${sessionId}`, { method: 'DELETE' });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       return await response.json();
     } catch (error) {
-      console.error('Session deletion failed:', error);
-      return { success: false, error: 'Failed to archive consultation' };
-    }
-  }
-  async updateSessionTitle(sessionId: string, title: string): Promise<{ success: boolean; error?: string }> {
-    try {
-      const response = await fetch(`/api/sessions/${sessionId}/title`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title })
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return await response.json();
-    } catch (error) {
-      console.error('Title update failed:', error);
-      return { success: false, error: 'Failed to update record title' };
-    }
-  }
-  async clearAllSessions(): Promise<{ success: boolean; data?: { deletedCount: number }; error?: string }> {
-    try {
-      const response = await fetch('/api/sessions', { method: 'DELETE' });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      return await response.json();
-    } catch (error) {
-      console.error('Clear all sessions failed:', error);
-      return { success: false, error: 'Failed to clear consultation database' };
+      return { success: false };
     }
   }
   async updateModel(model: string): Promise<ChatResponse> {
+    this.ensureBaseUrl();
     try {
       const response = await fetch(`${this.baseUrl}/model`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ model })
       });
-      if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
-      }
       return await response.json();
     } catch (error) {
-      console.error('Failed to update model:', error);
-      return { success: false, error: 'Failed to switch intelligence core' };
+      return { success: false, error: 'Model switch failed' };
     }
   }
 }
 export const chatService = new ChatService();
 export const formatTime = (timestamp: number): string => {
-  return new Date(timestamp).toLocaleTimeString([], {
-    hour: '2-digit',
-    minute: '2-digit'
-  });
+  return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
 export const generateSessionTitle = (firstUserMessage?: string): string => {
   const now = new Date();
-  const dateTime = now.toLocaleString([], {
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
-  });
-  if (!firstUserMessage || !firstUserMessage.trim()) {
-    return `Consultation ${dateTime}`;
-  }
-  const cleanMessage = firstUserMessage.trim().replace(/\s+/g, ' ');
-  const truncated = cleanMessage.length > 40
-    ? cleanMessage.slice(0, 37) + '...'
-    : cleanMessage;
-  return `${truncated} • ${dateTime}`;
+  const dateTime = now.toLocaleString([], { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+  if (!firstUserMessage?.trim()) return `Consultation ${dateTime}`;
+  const truncated = firstUserMessage.trim().replace(/\s+/g, ' ').slice(0, 37);
+  return `${truncated}${firstUserMessage.length > 37 ? '...' : ''} • ${dateTime}`;
 };
 export const renderToolCall = (toolCall: ToolCall): string => {
-  const result = toolCall.result as WeatherResult | MCPResult | ErrorResult | undefined;
-  if (!result) return `⚠️ ${toolCall.name}: No result`;
-  if ('error' in result) return `❌ ${toolCall.name}: ${result.error}`;
-  if ('content' in result) return `🔧 ${toolCall.name}: Indexing Complete`;
-  return `🔧 ${toolCall.name}: Task Done`;
+  const result = toolCall.result as any;
+  if (!result) return `Task: ${toolCall.name}`;
+  if (result.error) return `Error in ${toolCall.name}`;
+  return `${toolCall.name} completed`;
 };
