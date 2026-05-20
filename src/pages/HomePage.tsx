@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
+import * as React from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   Sparkles,
   User,
@@ -52,6 +53,34 @@ const DEMO_PATIENT: HealthIdentity = {
   allergies: ["Penicillin", "Peanuts"],
   lastCheckup: "2024-12-15"
 };
+// --- Sub-components (Moved outside to prevent Rules of Hooks violations/re-renders) ---
+const QuickAction = ({ 
+  icon: Icon, 
+  label, 
+  query, 
+  color, 
+  onClick 
+}: { 
+  icon: any, 
+  label: string, 
+  query: string, 
+  color: string, 
+  onClick: (q: string) => void 
+}) => (
+  <button
+    onClick={() => onClick(query)}
+    className={cn(
+      "flex flex-col items-start p-4 rounded-3xl border border-border/40 bg-white/50 dark:bg-slate-900/50 hover:bg-white dark:hover:bg-slate-900 transition-all hover:scale-[1.02] active:scale-[0.98] text-left group",
+      "shadow-sm hover:shadow-md"
+    )}
+  >
+    <div className={cn("p-2 rounded-2xl mb-3", color)}>
+      <Icon className="w-5 h-5" />
+    </div>
+    <span className="font-medium text-sm text-foreground">{label}</span>
+    <span className="text-xs text-muted-foreground mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Ask Veridia →</span>
+  </button>
+);
 // --- Main Page Component ---
 export function HomePage() {
   // State
@@ -158,43 +187,33 @@ export function HomePage() {
     setIsAuthModalOpen(false);
     toast.success("Identity verified via Veridia Vault");
   };
-  const QuickAction = ({ icon: Icon, label, query, color }: { icon: any, label: string, query: string, color: string }) => (
-    <button
-      onClick={() => handleSendMessage(undefined, query)}
-      className={cn(
-        "flex flex-col items-start p-4 rounded-3xl border border-border/40 bg-white/50 dark:bg-slate-900/50 hover:bg-white dark:hover:bg-slate-900 transition-all hover:scale-[1.02] active:scale-[0.98] text-left group",
-        "shadow-sm hover:shadow-md"
-      )}
-    >
-      <div className={cn("p-2 rounded-2xl mb-3", color)}>
-        <Icon className="w-5 h-5" />
-      </div>
-      <span className="font-medium text-sm text-foreground">{label}</span>
-      <span className="text-xs text-muted-foreground mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Ask Veridia →</span>
-    </button>
-  );
   return (
     <div className="flex h-screen bg-[#F8FAFC] dark:bg-[#0F172A] overflow-hidden selection:bg-teal-100 dark:selection:bg-teal-900 relative">
       <Toaster richColors position="top-center" />
       {/* --- Responsive Sidebar --- */}
       <AnimatePresence mode="wait">
         {isSidebarOpen && (
-          <>
+          <motion.div 
+            key="sidebar-container"
+            className="fixed inset-0 z-40 flex"
+          >
             {/* Mobile Overlay Backdrop */}
             <motion.div
+              key="sidebar-overlay"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setIsSidebarOpen(false)}
-              className="fixed inset-0 bg-slate-950/20 backdrop-blur-sm z-40 md:hidden"
+              className="absolute inset-0 bg-slate-950/20 backdrop-blur-sm md:hidden"
             />
             {/* Sidebar Content */}
             <motion.aside
+              key="sidebar-aside"
               initial={{ x: -300, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               exit={{ x: -300, opacity: 0 }}
               transition={{ type: "spring", damping: 25, stiffness: 200 }}
-              className="fixed md:relative z-50 w-72 h-full bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl border-r border-border/50 flex flex-col flex-shrink-0"
+              className="relative w-72 h-full bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl border-r border-border/50 flex flex-col flex-shrink-0"
             >
               <div className="p-6">
                 <div className="flex items-center gap-3 mb-8">
@@ -270,7 +289,7 @@ export function HomePage() {
                 </div>
               </div>
             </motion.aside>
-          </>
+          </motion.div>
         )}
       </AnimatePresence>
       {/* --- Main Content --- */}
@@ -334,28 +353,36 @@ export function HomePage() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 px-4">
                   <QuickAction
+                    key="qa-annual"
                     icon={Activity}
                     label="Health Check"
                     query="What should I check for my annual physical?"
                     color="bg-rose-500/10 text-rose-600"
+                    onClick={(q) => handleSendMessage(undefined, q)}
                   />
                   <QuickAction
+                    key="qa-medical-id"
                     icon={Database}
                     label="Medical ID"
                     query="Show my current medical identity summary."
                     color="bg-blue-500/10 text-blue-600"
+                    onClick={(q) => handleSendMessage(undefined, q)}
                   />
                   <QuickAction
+                    key="qa-brain"
                     icon={Brain}
                     label="Brain Health"
                     query="Tips for improving cognitive focus and sleep."
                     color="bg-purple-500/10 text-purple-600"
+                    onClick={(q) => handleSendMessage(undefined, q)}
                   />
                   <QuickAction
+                    key="qa-cardio"
                     icon={HeartPulse}
                     label="Cardio Vitality"
                     query="Analyze the benefits of zone 2 heart rate training."
                     color="bg-emerald-500/10 text-emerald-600"
+                    onClick={(q) => handleSendMessage(undefined, q)}
                   />
                 </div>
               </motion.div>
@@ -421,19 +448,23 @@ export function HomePage() {
         <div className="p-4 md:p-8 pt-0 z-30 flex-shrink-0">
           <div className="max-w-4xl mx-auto relative">
             <div className="absolute -top-12 left-1/2 -translate-x-1/2 w-full flex justify-center pointer-events-none">
-              {isLoading && (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  className="bg-white/90 dark:bg-slate-900/90 border border-border/60 px-4 py-1.5 rounded-full shadow-2xl flex items-center gap-2"
-                >
-                  <div className="flex gap-0.5">
-                    <div className="w-1 h-1 bg-teal-500 rounded-full animate-ping" />
-                    <div className="w-1 h-1 bg-teal-500 rounded-full animate-ping [animation-delay:0.2s]" />
-                  </div>
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-teal-600">Processing Stream</span>
-                </motion.div>
-              )}
+              <AnimatePresence>
+                {isLoading && (
+                  <motion.div
+                    key="loading-indicator"
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    className="bg-white/90 dark:bg-slate-900/90 border border-border/60 px-4 py-1.5 rounded-full shadow-2xl flex items-center gap-2 pointer-events-auto"
+                  >
+                    <div className="flex gap-0.5">
+                      <div className="w-1 h-1 bg-teal-500 rounded-full animate-ping" />
+                      <div className="w-1 h-1 bg-teal-500 rounded-full animate-ping [animation-delay:0.2s]" />
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-teal-600">Processing Stream</span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
             <form
               onSubmit={handleSendMessage}
