@@ -16,7 +16,10 @@ import {
   HeartPulse,
   Brain,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  Info,
+  Clock,
+  ClipboardList
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { chatService, formatTime, generateSessionTitle, MODELS } from '@/lib/chat';
@@ -26,7 +29,7 @@ import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { cn } from '@/lib/utils';
@@ -37,78 +40,167 @@ interface HealthIdentity {
   bloodType: string;
   allergies: string[];
   lastCheckup: string;
+  medications: string[];
+  vitals: {
+    heartRate: string;
+    bp: string;
+    temp: string;
+  };
 }
 const DEMO_PATIENT: HealthIdentity = {
   id: "VER-9928-XA",
   name: "Alex Sterling",
   bloodType: "O Positive",
   allergies: ["Penicillin", "Peanuts"],
-  lastCheckup: "2024-12-15"
+  lastCheckup: "2024-12-15",
+  medications: ["Vitamin D3", "Lisinopril"],
+  vitals: {
+    heartRate: "72 bpm",
+    bp: "120/80",
+    temp: "98.6 °F"
+  }
 };
-// --- Custom Identity Overlay (Replacing Radix Dialog) ---
-const IdentityVerificationOverlay = ({ 
-  onVerify, 
-  onClose 
-}: { 
-  onVerify: () => void; 
-  onClose: () => void 
-}) => (
-  <motion.div
-    initial={{ opacity: 0 }}
-    animate={{ opacity: 1 }}
-    exit={{ opacity: 0 }}
-    className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-md"
-  >
-    <motion.div
-      initial={{ scale: 0.9, opacity: 0, y: 20 }}
-      animate={{ scale: 1, opacity: 1, y: 0 }}
-      exit={{ scale: 0.9, opacity: 0, y: 20 }}
-      className="w-full max-w-md bg-slate-900 border border-white/10 rounded-[2.5rem] p-8 text-white shadow-2xl relative overflow-hidden"
-    >
-      <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-teal-500 to-blue-500" />
-      <button 
-        onClick={onClose}
-        className="absolute top-6 right-6 p-2 rounded-full hover:bg-white/10 transition-colors"
-      >
-        <X className="w-5 h-5 text-slate-400" />
-      </button>
-      <div className="flex flex-col items-center text-center space-y-6">
-        <div className="w-16 h-16 rounded-3xl bg-gradient-to-br from-teal-400 to-blue-500 flex items-center justify-center shadow-xl shadow-teal-500/20">
-          <ShieldCheck className="w-8 h-8 text-white" />
-        </div>
-        <div className="space-y-2">
-          <h2 className="text-2xl font-bold tracking-tight">Veridia Identity</h2>
-          <p className="text-sm text-slate-400">
-            Verify patient credentials to access clinical memory drive and medical records.
-          </p>
-        </div>
-        <div className="w-full space-y-4">
-          <div className="p-4 rounded-2xl bg-white/5 border border-white/10 space-y-3">
-            <div className="flex justify-between items-center text-xs">
-              <span className="text-slate-400 font-medium">Demo Patient ID</span>
-              <span className="text-teal-400 font-mono">{DEMO_PATIENT.id}</span>
-            </div>
-            <div className="flex justify-between items-center text-xs">
-              <span className="text-slate-400 font-medium">Full Name</span>
-              <span className="text-white font-mono">{DEMO_PATIENT.name}</span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 text-[11px] text-amber-500 font-medium">
-            <HeartPulse className="w-3.5 h-3.5 shrink-0" />
-            <span>Verification enables context-aware AI summaries.</span>
-          </div>
-        </div>
-        <Button
-          onClick={onVerify}
-          className="w-full h-14 rounded-2xl bg-white text-black hover:bg-slate-100 font-bold text-md shadow-xl transition-all active:scale-95"
+// --- View 2: Patient Dashboard Panel ---
+const PatientDashboardPanel = ({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) => (
+  <AnimatePresence>
+    {isOpen && (
+      <>
+        <motion.div 
+          initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+          onClick={onClose}
+          className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-[120]"
+        />
+        <motion.div
+          initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+          transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+          className="fixed right-0 top-0 h-full w-full max-w-md bg-white dark:bg-slate-950 border-l border-border z-[130] shadow-2xl p-0 flex flex-col"
         >
-          Verify & Connect
-        </Button>
-      </div>
-    </motion.div>
-  </motion.div>
+          <div className="p-6 border-b border-border flex items-center justify-between bg-slate-50 dark:bg-slate-900/50">
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-teal-500 rounded-xl">
+                <User className="w-5 h-5 text-white" />
+              </div>
+              <h2 className="text-xl font-bold">Health Identity</h2>
+            </div>
+            <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full"><X className="w-5 h-5" /></Button>
+          </div>
+          <ScrollArea className="flex-1 p-6">
+            <div className="space-y-6">
+              <Card className="p-4 bg-gradient-to-br from-teal-500/10 to-blue-500/10 border-teal-500/20 rounded-3xl">
+                <div className="flex items-center gap-4 mb-4">
+                  <Avatar className="h-12 w-12 border-2 border-white dark:border-slate-800 shadow-sm">
+                    <AvatarFallback className="bg-teal-500 text-white font-bold">AS</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <h3 className="font-bold text-lg">{DEMO_PATIENT.name}</h3>
+                    <p className="text-xs text-muted-foreground font-mono">{DEMO_PATIENT.id}</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-white/50 dark:bg-slate-900/50 rounded-2xl border border-white/20 shadow-sm">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Blood Type</p>
+                    <p className="text-sm font-bold">{DEMO_PATIENT.bloodType}</p>
+                  </div>
+                  <div className="p-3 bg-white/50 dark:bg-slate-900/50 rounded-2xl border border-white/20 shadow-sm">
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Last Visit</p>
+                    <p className="text-sm font-bold">{DEMO_PATIENT.lastCheckup}</p>
+                  </div>
+                </div>
+              </Card>
+              <div className="space-y-4">
+                <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground px-1">Live Vitals</h4>
+                <div className="grid grid-cols-3 gap-2">
+                  {[
+                    { label: 'HR', val: DEMO_PATIENT.vitals.heartRate, icon: HeartPulse, color: 'text-rose-500' },
+                    { label: 'BP', val: DEMO_PATIENT.vitals.bp, icon: Activity, color: 'text-teal-500' },
+                    { label: 'Temp', val: DEMO_PATIENT.vitals.temp, icon: ThermometerIcon, color: 'text-blue-500' }
+                  ].map((v, i) => (
+                    <div key={i} className="p-3 rounded-2xl border border-border bg-slate-50 dark:bg-slate-900 flex flex-col items-center text-center">
+                      <v.icon className={cn("w-4 h-4 mb-2", v.color)} />
+                      <span className="text-[10px] font-medium text-muted-foreground uppercase">{v.label}</span>
+                      <span className="text-xs font-bold">{v.val}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-4">
+                <h4 className="text-xs font-bold uppercase tracking-widest text-muted-foreground px-1">Allergies & Alerts</h4>
+                <div className="flex flex-wrap gap-2">
+                  {DEMO_PATIENT.allergies.map(a => (
+                    <Badge key={a} variant="outline" className="bg-rose-500/5 border-rose-500/20 text-rose-600 rounded-full py-1 px-3">
+                      <AlertCircle className="w-3 h-3 mr-1.5" /> {a}
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </ScrollArea>
+        </motion.div>
+      </>
+    )}
+  </AnimatePresence>
 );
-// --- Simple Notification System (Replacing Sonner) ---
+const ThermometerIcon = ({ className }: { className?: string }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></svg>
+);
+// --- View 3: Memory Drive Panel ---
+const MemoryDrivePanel = ({ isOpen, onClose, messages }: { isOpen: boolean; onClose: () => void; messages: Message[] }) => {
+  const records = messages.filter(m => m.role === 'assistant' && m.content.length > 50).slice(-5);
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <>
+          <motion.div 
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={onClose}
+            className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-[120]"
+          />
+          <motion.div
+            initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+            transition={{ type: 'spring', damping: 25, stiffness: 200 }}
+            className="fixed right-0 top-0 h-full w-full max-w-md bg-white dark:bg-slate-950 border-l border-border z-[130] shadow-2xl p-0 flex flex-col"
+          >
+            <div className="p-6 border-b border-border flex items-center justify-between bg-slate-50 dark:bg-slate-900/50">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-blue-500 rounded-xl">
+                  <Database className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-xl font-bold">Clinical Memory</h2>
+              </div>
+              <Button variant="ghost" size="icon" onClick={onClose} className="rounded-full"><X className="w-5 h-5" /></Button>
+            </div>
+            <ScrollArea className="flex-1 p-6">
+              {records.length === 0 ? (
+                <div className="h-full flex flex-col items-center justify-center text-center p-8 space-y-4">
+                  <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-900 flex items-center justify-center">
+                    <Database className="w-8 h-8 text-slate-400" />
+                  </div>
+                  <p className="text-sm text-muted-foreground">No indexed health records found. Conversations will be automatically summarized here.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <p className="text-xs text-muted-foreground mb-4">Veridia has indexed {records.length} key clinical insights from your session.</p>
+                  {records.map((r, i) => (
+                    <Card key={i} className="p-4 border-border/60 hover:border-teal-500/40 transition-colors cursor-pointer group">
+                      <div className="flex items-center justify-between mb-2">
+                        <Badge variant="secondary" className="text-[10px] font-bold uppercase tracking-tighter bg-blue-500/5 text-blue-600">AI Summary</Badge>
+                        <span className="text-[10px] text-muted-foreground font-medium">{formatTime(r.timestamp)}</span>
+                      </div>
+                      <p className="text-xs leading-relaxed line-clamp-3 text-foreground/80 group-hover:text-foreground transition-colors">
+                        {r.content}
+                      </p>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </ScrollArea>
+          </motion.div>
+        </>
+      )}
+    </AnimatePresence>
+  );
+};
+// --- Notification UI ---
 const Notification = ({ message, type, onClose }: { message: string, type: 'success' | 'error' | 'info', onClose: () => void }) => {
   useEffect(() => {
     const timer = setTimeout(onClose, 4000);
@@ -116,11 +208,9 @@ const Notification = ({ message, type, onClose }: { message: string, type: 'succ
   }, [onClose]);
   return (
     <motion.div
-      initial={{ y: -50, opacity: 0 }}
-      animate={{ y: 0, opacity: 1 }}
-      exit={{ y: -50, opacity: 0 }}
+      initial={{ y: -50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -50, opacity: 0 }}
       className={cn(
-        "fixed top-6 left-1/2 -translate-x-1/2 z-[110] px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border backdrop-blur-md min-w-[300px]",
+        "fixed top-6 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border backdrop-blur-md min-w-[300px]",
         type === 'success' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400" :
         type === 'error' ? "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400" :
         "bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-400"
@@ -131,33 +221,6 @@ const Notification = ({ message, type, onClose }: { message: string, type: 'succ
     </motion.div>
   );
 };
-// --- Sub-components ---
-const QuickAction = ({
-  icon: Icon,
-  label,
-  query,
-  color,
-  onClick
-}: {
-  icon: any,
-  label: string,
-  query: string,
-  color: string,
-  onClick: (q: string) => void
-}) => (
-  <button
-    onClick={() => onClick(query)}
-    className={cn(
-      "flex flex-col items-start p-4 rounded-3xl border border-border/40 bg-white/50 dark:bg-slate-900/50 hover:bg-white dark:hover:bg-slate-900 transition-all hover:scale-[1.02] active:scale-[0.98] text-left group shadow-sm hover:shadow-md"
-    )}
-  >
-    <div className={cn("p-2 rounded-2xl mb-3", color)}>
-      <Icon className="w-5 h-5" />
-    </div>
-    <span className="font-medium text-sm text-foreground">{label}</span>
-    <span className="text-xs text-muted-foreground mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Ask Veridia →</span>
-  </button>
-);
 export function HomePage() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessions, setSessions] = useState<SessionInfo[]>([]);
@@ -166,79 +229,55 @@ export function HomePage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [isAuthOverlayOpen, setIsAuthOverlayOpen] = useState(false);
+  const [isDashboardOpen, setIsDashboardOpen] = useState(false);
+  const [isMemoryOpen, setIsMemoryOpen] = useState(false);
   const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    loadSessions();
-    loadMessages();
-    const timer = setTimeout(() => setIsAuthOverlayOpen(true), 1500);
-    return () => clearTimeout(timer);
-  }, []);
+    const init = async () => {
+      await chatService.validateSession();
+      loadSessions();
+      loadMessages();
+    };
+    init();
+  }, [currentSessionId]);
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollIntoView({ behavior: 'smooth' });
-    }
+    if (scrollRef.current) scrollRef.current.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-  const showNotify = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
-    setNotification({ message, type });
-  };
+  const showNotify = (message: string, type: 'success' | 'error' | 'info' = 'info') => setNotification({ message, type });
   const loadSessions = async () => {
-    try {
-      const res = await chatService.listSessions();
-      if (res.success && Array.isArray(res.data)) {
-        setSessions(res.data);
-      }
-    } catch (err) {
-      console.error("Failed to load sessions", err);
-    }
+    const res = await chatService.listSessions();
+    if (res.success && Array.isArray(res.data)) setSessions(res.data);
   };
   const loadMessages = async () => {
-    try {
-      const res = await chatService.getMessages();
-      if (res.success && res.data) {
-        setMessages(res.data.messages || []);
-      }
-    } catch (err) {
-      console.error("Failed to load messages", err);
-    }
+    const res = await chatService.getMessages();
+    if (res.success && res.data) setMessages(res.data.messages || []);
   };
-  const handleSendMessage = async (e?: React.FormEvent, presetMessage?: string) => {
+  const handleSendMessage = async (e?: React.FormEvent, preset?: string) => {
     e?.preventDefault();
-    const content = presetMessage || input;
+    const content = preset || input;
     if (!content.trim() || isLoading) return;
     if (messages.length === 0) {
       const title = generateSessionTitle(content);
       await chatService.createSession(title, currentSessionId, content);
       loadSessions();
     }
-    const userMsg: Message = {
-      id: crypto.randomUUID(),
-      role: 'user',
-      content,
-      timestamp: Date.now()
-    };
+    const userMsg: Message = { id: crypto.randomUUID(), role: 'user', content, timestamp: Date.now() };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setIsLoading(true);
     let assistantContent = '';
     try {
-      const res = await chatService.sendMessage(content, MODELS[0].id, (chunk) => {
+      await chatService.sendMessage(content, MODELS[0].id, (chunk) => {
         assistantContent += chunk;
         setMessages(prev => {
           const last = prev[prev.length - 1];
-          if (last && last.role === 'assistant') {
-            return [...prev.slice(0, -1), { ...last, content: assistantContent }];
-          } else {
-            return [...prev, { id: 'temp-ai', role: 'assistant', content: assistantContent, timestamp: Date.now() }];
-          }
+          if (last?.id === 'temp-ai') return [...prev.slice(0, -1), { ...last, content: assistantContent }];
+          return [...prev, { id: 'temp-ai', role: 'assistant', content: assistantContent, timestamp: Date.now() }];
         });
       });
-      if (!res.success) {
-        showNotify("Failed to reach Veridia intelligence.", 'error');
-      }
     } catch (err) {
-      showNotify("Connection error.", 'error');
+      showNotify("Intelligence core unreachable.", 'error');
     } finally {
       setIsLoading(false);
       loadMessages();
@@ -249,319 +288,187 @@ export function HomePage() {
     setCurrentSessionId(chatService.getSessionId());
     setMessages([]);
     loadSessions();
-    if (window.innerWidth < 768) setIsSidebarOpen(false);
-  };
-  const switchSession = async (id: string) => {
-    chatService.switchSession(id);
-    setCurrentSessionId(id);
-    await loadMessages();
-    if (window.innerWidth < 768) setIsSidebarOpen(false);
-  };
-  const deleteSession = async (id: string) => {
-    await chatService.deleteSession(id);
-    if (id === currentSessionId) handleNewChat();
-    else loadSessions();
-    showNotify("Session archived", 'info');
-  };
-  const authenticate = () => {
-    setIsAuthenticated(true);
-    setIsAuthOverlayOpen(false);
-    showNotify("Identity verified via Veridia Vault", 'success');
   };
   return (
-    <div className="max-w-7xl mx-auto px-0 h-screen bg-[#F8FAFC] dark:bg-[#0F172A] overflow-hidden selection:bg-teal-100 dark:selection:bg-teal-900 flex relative">
+    <div className="flex h-screen bg-background overflow-hidden selection:bg-teal-100 dark:selection:bg-teal-900">
       <AnimatePresence>
-        {notification && (
-          <Notification 
-            message={notification.message} 
-            type={notification.type} 
-            onClose={() => setNotification(null)} 
-          />
-        )}
+        {notification && <Notification {...notification} onClose={() => setNotification(null)} />}
       </AnimatePresence>
-      <AnimatePresence>
-        {isAuthOverlayOpen && (
-          <IdentityVerificationOverlay 
-            onVerify={authenticate} 
-            onClose={() => setIsAuthOverlayOpen(false)} 
-          />
-        )}
-      </AnimatePresence>
+      <PatientDashboardPanel isOpen={isDashboardOpen} onClose={() => setIsDashboardOpen(false)} />
+      <MemoryDrivePanel isOpen={isMemoryOpen} onClose={() => setIsMemoryOpen(false)} messages={messages} />
       {/* --- Sidebar --- */}
       <AnimatePresence>
         {isSidebarOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsSidebarOpen(false)}
-              className="fixed inset-0 z-40 bg-slate-950/20 backdrop-blur-sm md:hidden"
-            />
-            <motion.aside
-              initial={{ x: -300 }}
-              animate={{ x: 0 }}
-              exit={{ x: -300 }}
-              className="fixed md:static inset-y-0 left-0 z-50 w-72 h-full bg-white/80 dark:bg-slate-950/80 backdrop-blur-xl border-r border-border/50 flex flex-col flex-shrink-0"
-            >
-              <div className="p-6">
-                <div className="flex items-center gap-3 mb-8">
-                  <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-teal-400 to-blue-500 flex items-center justify-center shadow-lg shadow-teal-500/20">
-                    <ShieldCheck className="w-6 h-6 text-white" />
-                  </div>
-                  <div>
-                    <h1 className="font-bold text-xl tracking-tight">Veridia</h1>
-                    <p className="text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">Health Intelligence</p>
-                  </div>
+          <motion.aside
+            initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }}
+            className="w-72 bg-white/50 dark:bg-slate-950/50 backdrop-blur-xl border-r border-border flex flex-col z-50 fixed md:static inset-y-0"
+          >
+            <div className="p-6 flex-1 flex flex-col overflow-hidden">
+              <div className="flex items-center gap-3 mb-8">
+                <div className="w-10 h-10 rounded-2xl bg-teal-500 flex items-center justify-center shadow-lg shadow-teal-500/20">
+                  <ShieldCheck className="w-6 h-6 text-white" />
                 </div>
-                <Button
-                  onClick={handleNewChat}
-                  variant="outline"
-                  className="w-full justify-start gap-2 rounded-2xl border-dashed border-2 py-6 mb-6 hover:bg-accent/50"
+                <div>
+                  <h1 className="font-bold text-lg tracking-tight">Veridia</h1>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Clinical AI</p>
+                </div>
+              </div>
+              <Button onClick={handleNewChat} variant="outline" className="w-full gap-2 rounded-2xl py-6 mb-6 border-dashed border-2 hover:bg-accent/50">
+                <Plus className="w-4 h-4" /> New Consult
+              </Button>
+              <div className="flex-1 overflow-hidden flex flex-col">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-2 mb-2">History</p>
+                <ScrollArea className="flex-1">
+                  <div className="space-y-1">
+                    {sessions.map(s => (
+                      <button
+                        key={s.id}
+                        onClick={() => { setCurrentSessionId(s.id); chatService.switchSession(s.id); }}
+                        className={cn(
+                          "w-full text-left px-3 py-2.5 rounded-xl text-xs transition-all flex items-center gap-3 group",
+                          s.id === currentSessionId ? "bg-accent text-accent-foreground font-semibold" : "hover:bg-accent/40 text-muted-foreground"
+                        )}
+                      >
+                        <History className="w-3.5 h-3.5 shrink-0 opacity-50" />
+                        <span className="truncate flex-1">{s.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
+            </div>
+            <div className="p-6 border-t border-border/40 space-y-4 bg-slate-50/50 dark:bg-slate-900/50">
+              <div className="flex items-center justify-between">
+                <div 
+                  onClick={() => setIsDashboardOpen(true)}
+                  className="flex items-center gap-3 cursor-pointer hover:bg-white dark:hover:bg-slate-800 p-1 rounded-xl transition-all"
                 >
-                  <Plus className="w-4 h-4" />
-                  New Consultation
-                </Button>
-                <div className="space-y-1">
-                  <p className="text-xs font-semibold text-muted-foreground px-2 mb-2 uppercase tracking-tighter">Recent Consults</p>
-                  <ScrollArea className="h-[40vh]">
-                    {sessions.length === 0 ? (
-                      <p className="text-xs text-muted-foreground px-2 italic">No previous logs</p>
-                    ) : (
-                      sessions.map(s => (
-                        <div key={s.id} className="group relative">
-                          <button
-                            onClick={() => switchSession(s.id)}
-                            className={cn(
-                              "w-full text-left px-3 py-2.5 rounded-xl text-sm transition-colors flex items-center gap-2",
-                              s.id === currentSessionId ? "bg-accent text-accent-foreground font-medium" : "hover:bg-accent/30 text-muted-foreground hover:text-foreground"
-                            )}
-                          >
-                            <History className="w-3.5 h-3.5 shrink-0" />
-                            <span className="truncate">{s.title}</span>
-                          </button>
-                          <button
-                            onClick={(e) => { e.stopPropagation(); deleteSession(s.id); }}
-                            className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1 hover:text-destructive transition-opacity"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))
-                    )}
-                  </ScrollArea>
-                </div>
-              </div>
-              <div className="mt-auto p-6 space-y-4">
-                <div className="p-4 rounded-2xl bg-teal-500/5 border border-teal-500/10">
-                  <div className="flex items-center gap-2 mb-2 text-teal-600 dark:text-teal-400">
-                    <Database className="w-4 h-4" />
-                    <span className="text-xs font-bold uppercase tracking-wider">Memory Drive</span>
+                  <Avatar className="h-8 w-8 ring-2 ring-teal-500/20">
+                    <AvatarFallback className="bg-teal-500 text-white text-[10px] font-bold">AS</AvatarFallback>
+                  </Avatar>
+                  <div className="flex flex-col">
+                    <span className="text-[11px] font-bold">Alex Sterling</span>
+                    <span className="text-[9px] text-teal-600 font-bold uppercase tracking-tighter">Verified ID</span>
                   </div>
-                  <p className="text-[11px] text-muted-foreground leading-relaxed">
-                    Your history is indexed for contextual intelligence.
-                  </p>
                 </div>
-                <Separator className="bg-border/40" />
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-8 w-8 ring-2 ring-background shadow-sm">
-                      <AvatarFallback>AS</AvatarFallback>
-                    </Avatar>
-                    <div className="flex flex-col">
-                      <span className="text-xs font-bold">{isAuthenticated ? DEMO_PATIENT.name : "Guest User"}</span>
-                      <span className="text-[10px] text-muted-foreground">{isAuthenticated ? "Identity Verified" : "Unverified"}</span>
-                    </div>
-                  </div>
-                  <ThemeToggle className="static" />
-                </div>
+                <ThemeToggle className="static" />
               </div>
-            </motion.aside>
-          </>
+            </div>
+          </motion.aside>
         )}
       </AnimatePresence>
-      {/* --- Main Content --- */}
-      <main className="flex-1 flex flex-col relative overflow-hidden h-full min-w-0">
-        <header className="h-16 flex items-center justify-between px-4 md:px-6 border-b border-border/40 bg-white/40 dark:bg-slate-950/40 backdrop-blur-xl z-30 flex-shrink-0">
+      {/* --- Main Area --- */}
+      <main className="flex-1 flex flex-col relative min-w-0">
+        <header className="h-16 border-b border-border/40 px-4 md:px-8 flex items-center justify-between bg-white/40 dark:bg-slate-950/40 backdrop-blur-md z-40">
           <div className="flex items-center gap-4">
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-              className="rounded-xl hover:bg-accent/50"
-            >
+            <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="rounded-xl">
               <Menu className="w-5 h-5" />
             </Button>
-            <div className="flex flex-col">
-              <h2 className="text-sm font-bold">Veridia Intelligence</h2>
+            <div className="hidden sm:flex flex-col">
+              <h2 className="text-sm font-bold">Clinical Memory Active</h2>
               <div className="flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[10px] text-muted-foreground font-medium uppercase tracking-widest">Active Core</span>
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">End-to-End Encrypted</span>
               </div>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-             <Badge variant="secondary" className="hidden sm:flex rounded-full px-3 py-1 font-medium text-[11px] bg-white/80 dark:bg-slate-800/80 border-border/50">
-               <Activity className="w-3 h-3 mr-1.5 text-teal-500" />
-               V-Secure 2.4
-             </Badge>
-             {!isAuthenticated && (
-                <Button
-                  size="sm"
-                  onClick={() => setIsAuthOverlayOpen(true)}
-                  className="rounded-full bg-teal-600 hover:bg-teal-700 text-white text-[11px] h-8 px-4 font-bold shadow-lg shadow-teal-600/20"
-                >
-                  Verify
-                </Button>
-             )}
+          <div className="flex items-center gap-2">
+            <Button variant="outline" size="sm" onClick={() => setIsMemoryOpen(true)} className="rounded-full h-8 text-[11px] font-bold gap-1.5 bg-white dark:bg-slate-900">
+              <Database className="w-3 h-3 text-teal-500" /> Drive
+            </Button>
+            <Badge variant="secondary" className="hidden lg:flex h-8 rounded-full border-border/40 bg-slate-100 dark:bg-slate-800 text-[10px] font-bold px-3">
+              V-SECURE 2.4.9
+            </Badge>
           </div>
         </header>
-        <div className="flex-1 overflow-y-auto p-4 md:p-8 space-y-8 scroll-smooth">
-          <div className="max-w-4xl mx-auto space-y-8">
-            {messages.length === 0 && (
-              <div className="py-12 md:py-20 text-center space-y-10">
-                <div className="space-y-4">
-                  <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-teal-500/10 text-teal-600 dark:text-teal-400 text-xs font-bold border border-teal-500/20">
-                    <Sparkles className="w-3.5 h-3.5" />
-                    AI Health Companion
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="py-8 md:py-10 lg:py-12 max-w-4xl mx-auto space-y-12">
+              {messages.length === 0 ? (
+                <div className="py-12 text-center space-y-8">
+                  <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+                    <Badge variant="outline" className="rounded-full bg-teal-500/5 text-teal-600 border-teal-500/20 py-1 px-4 font-bold text-xs uppercase">
+                      <Sparkles className="w-3 h-3 mr-2" /> Medical Intelligence
+                    </Badge>
+                    <h1 className="text-4xl md:text-6xl font-bold tracking-tight">Your Health, <span className="text-teal-500">Synthesized</span>.</h1>
+                    <p className="text-muted-foreground text-lg max-w-xl mx-auto">Veridia indexes your clinical records and provides real-time health intelligence through a secure vault.</p>
+                  </motion.div>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    {[
+                      { icon: Activity, label: "Analyze Vitals", q: "Analyze my current vitals for anomalies." },
+                      { icon: ClipboardList, label: "Review Records", q: "Summarize my last 3 health records." },
+                      { icon: Brain, label: "Brain Health", q: "Recommend cognitive health routine." }
+                    ].map((btn, i) => (
+                      <button key={i} onClick={() => handleSendMessage(undefined, btn.q)} className="p-6 rounded-3xl bg-white/50 dark:bg-slate-900/50 border border-border hover:border-teal-500/40 hover:scale-[1.02] transition-all text-left shadow-sm">
+                        <btn.icon className="w-6 h-6 text-teal-500 mb-4" />
+                        <h3 className="font-bold text-sm mb-1">{btn.label}</h3>
+                        <p className="text-xs text-muted-foreground">Ask Veridia Intelligence →</p>
+                      </button>
+                    ))}
                   </div>
-                  <h1 className="text-4xl md:text-6xl font-bold tracking-tight text-foreground">
-                    Your Health <span className="text-transparent bg-clip-text bg-gradient-to-r from-teal-500 to-blue-600">Reimagined</span>.
-                  </h1>
-                  <p className="text-muted-foreground max-w-xl mx-auto text-lg leading-relaxed">
-                    Verify identity, store records, and query clinical knowledge securely.
-                  </p>
                 </div>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 px-4">
-                  <QuickAction
-                    icon={Activity}
-                    label="Health Check"
-                    query="What should I check for my annual physical?"
-                    color="bg-rose-500/10 text-rose-600"
-                    onClick={(q) => handleSendMessage(undefined, q)}
-                  />
-                  <QuickAction
-                    icon={Database}
-                    label="Medical ID"
-                    query="Show my current medical identity summary."
-                    color="bg-blue-500/10 text-blue-600"
-                    onClick={(q) => handleSendMessage(undefined, q)}
-                  />
-                  <QuickAction
-                    icon={Brain}
-                    label="Brain Health"
-                    query="Tips for improving cognitive focus and sleep."
-                    color="bg-purple-500/10 text-purple-600"
-                    onClick={(q) => handleSendMessage(undefined, q)}
-                  />
-                  <QuickAction
-                    icon={HeartPulse}
-                    label="Cardio Vitality"
-                    query="Analyze the benefits of zone 2 heart rate training."
-                    color="bg-emerald-500/10 text-emerald-600"
-                    onClick={(q) => handleSendMessage(undefined, q)}
-                  />
-                </div>
-              </div>
-            )}
-            <div className="space-y-6">
-              {messages.map((m) => (
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  key={m.id}
-                  className={cn(
-                    "flex w-full gap-4",
-                    m.role === 'user' ? "flex-row-reverse" : "flex-row"
-                  )}
-                >
-                  <div className={cn(
-                    "w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-sm",
-                    m.role === 'user' ? "bg-white dark:bg-slate-800 border border-border" : "bg-gradient-to-br from-teal-500 to-blue-500 text-white"
-                  )}>
-                    {m.role === 'user' ? <User className="w-4 h-4" /> : <Sparkles className="w-4 h-4" />}
-                  </div>
-                  <div className={cn(
-                    "flex flex-col max-w-[85%] md:max-w-[70%]",
-                    m.role === 'user' ? "items-end" : "items-start"
-                  )}>
-                    <div className={cn(
-                      "px-5 py-3.5 rounded-3xl text-[14px] leading-relaxed shadow-sm",
-                      m.role === 'user'
-                        ? "bg-teal-600 text-white rounded-tr-none shadow-teal-500/10"
-                        : "bg-white dark:bg-slate-900 border border-border/60 rounded-tl-none"
-                    )}>
-                      {m.content}
-                      {m.toolCalls && m.toolCalls.length > 0 && (
-                        <div className="mt-4 pt-3 border-t border-border/50 space-y-2">
-                          {m.toolCalls.map(tc => (
-                            <div key={tc.id} className="flex items-center gap-2">
-                              <Badge variant="outline" className="bg-teal-500/5 text-teal-600 border-teal-500/20 text-[10px] font-bold uppercase">
-                                Tool: {tc.name}
-                              </Badge>
-                            </div>
-                          ))}
+              ) : (
+                <div className="space-y-8">
+                  {messages.map((m) => (
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} key={m.id} className={cn("flex gap-4", m.role === 'user' ? "flex-row-reverse" : "flex-row")}>
+                      <div className={cn("w-8 h-8 rounded-xl flex items-center justify-center shrink-0 shadow-sm font-bold text-[10px]", m.role === 'user' ? "bg-white border text-teal-600" : "bg-teal-500 text-white")}>
+                        {m.role === 'user' ? 'AS' : <Sparkles className="w-4 h-4" />}
+                      </div>
+                      <div className={cn("flex flex-col max-w-[85%] md:max-w-[75%]", m.role === 'user' ? "items-end" : "items-start")}>
+                        <div className={cn(
+                          "px-5 py-4 rounded-3xl text-sm leading-relaxed shadow-sm",
+                          m.role === 'user' 
+                            ? "bg-teal-600 text-white rounded-tr-none" 
+                            : "bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border border-border/60 rounded-tl-none bg-gradient-to-br from-teal-500/5 to-blue-500/5"
+                        )}>
+                          {m.content}
                         </div>
-                      )}
+                        <span className="mt-1 text-[9px] font-bold text-muted-foreground uppercase px-2">{formatTime(m.timestamp)}</span>
+                      </div>
+                    </motion.div>
+                  ))}
+                  {isLoading && (
+                    <div className="flex gap-4">
+                      <div className="w-8 h-8 rounded-xl bg-teal-500 flex items-center justify-center text-white shrink-0 shadow-lg shadow-teal-500/20"><Sparkles className="w-4 h-4 animate-pulse" /></div>
+                      <div className="px-5 py-4 rounded-3xl bg-slate-100 dark:bg-slate-900 animate-pulse text-xs font-medium text-muted-foreground">Veridia is thinking...</div>
                     </div>
-                    <span className="mt-1.5 text-[10px] text-muted-foreground font-medium px-1">
-                      {formatTime(m.timestamp)}
-                    </span>
-                  </div>
-                </motion.div>
-              ))}
-              <div ref={scrollRef} className="h-4" />
+                  )}
+                  <div ref={scrollRef} className="h-4" />
+                </div>
+              )}
             </div>
           </div>
         </div>
-        <div className="p-4 md:p-8 pt-0 z-30 flex-shrink-0">
-          <div className="max-w-4xl mx-auto relative">
-            <AnimatePresence>
-              {isLoading && (
-                <motion.div 
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 10 }}
-                  className="absolute -top-12 left-1/2 -translate-x-1/2 bg-white/90 dark:bg-slate-900/90 border border-border/60 px-4 py-1.5 rounded-full shadow-xl flex items-center gap-2"
+        <div className="p-4 md:p-8 bg-gradient-to-t from-background via-background to-transparent pt-12">
+          <div className="max-w-4xl mx-auto space-y-4">
+            <form onSubmit={handleSendMessage} className="relative group">
+              <div className="absolute inset-0 bg-teal-500/20 rounded-[2.5rem] blur-xl opacity-0 group-focus-within:opacity-100 transition-opacity" />
+              <div className="relative bg-white/40 dark:bg-slate-900/40 backdrop-blur-xl border border-border rounded-[2.5rem] p-2 flex items-center gap-2 shadow-2xl">
+                <Button type="button" variant="ghost" size="icon" className="rounded-full h-12 w-12 hover:bg-slate-200 dark:hover:bg-slate-800">
+                  <Plus className="w-5 h-5 text-muted-foreground" />
+                </Button>
+                <Input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  placeholder="Ask Veridia about your clinical history..."
+                  className="flex-1 bg-transparent border-none focus-visible:ring-0 text-sm h-12"
+                  disabled={isLoading}
+                />
+                <Button 
+                  type="submit" 
+                  disabled={!input.trim() || isLoading}
+                  className={cn("rounded-full h-12 w-12 transition-all", input.trim() ? "bg-teal-500 hover:bg-teal-600 shadow-lg shadow-teal-500/20" : "bg-muted")}
                 >
-                  <div className="w-1.5 h-1.5 bg-teal-500 rounded-full animate-ping" />
-                  <span className="text-[10px] font-bold uppercase tracking-widest text-teal-600">Processing</span>
-                </motion.div>
-              )}
-            </AnimatePresence>
-            <form
-              onSubmit={handleSendMessage}
-              className="bg-white/40 dark:bg-slate-900/40 backdrop-blur-md p-2 rounded-[2.5rem] flex items-center gap-2 border border-border/60 shadow-2xl"
-            >
-              <Button type="button" variant="ghost" size="icon" className="rounded-full h-12 w-12">
-                <Plus className="w-5 h-5 text-muted-foreground" />
-              </Button>
-              <Input
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                placeholder="Ask about health records or medical info..."
-                className="flex-1 bg-transparent border-none focus-visible:ring-0 text-[15px] h-12 px-2"
-                disabled={isLoading}
-              />
-              <Button
-                type="submit"
-                disabled={!input.trim() || isLoading}
-                className={cn(
-                  "rounded-full h-12 w-12 p-0 flex items-center justify-center",
-                  input.trim() ? "bg-teal-600 hover:bg-teal-700 shadow-lg shadow-teal-500/20" : "bg-muted text-muted-foreground"
-                )}
-              >
-                <Send className="w-5 h-5" />
-              </Button>
+                  <Send className="w-5 h-5" />
+                </Button>
+              </div>
             </form>
-            <div className="mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-[10px] text-muted-foreground/60 font-medium uppercase tracking-tight">
-              <div className="flex items-center gap-1.5"><ShieldCheck className="w-3 h-3" /> HIPAA Logic</div>
-              <div className="flex items-center gap-1.5"><Database className="w-3 h-3" /> Encrypted Memory</div>
-              <div className="flex items-center gap-1.5"><HeartPulse className="w-3 h-3" /> AI Consult Only</div>
+            <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2">
+              <div className="flex items-center gap-1.5 text-[9px] font-bold text-muted-foreground uppercase tracking-tighter"><ShieldCheck className="w-3 h-3 text-teal-500" /> HIPAA Compliant</div>
+              <div className="flex items-center gap-1.5 text-[9px] font-bold text-muted-foreground uppercase tracking-tighter"><Database className="w-3 h-3 text-blue-500" /> Memory Drive Linked</div>
+              <div className="flex items-center gap-1.5 text-[9px] font-bold text-muted-foreground uppercase tracking-tighter"><Activity className="w-3 h-3 text-rose-500" /> Live Vital Sync</div>
             </div>
-            <p className="mt-6 text-[10px] text-center text-muted-foreground/40 font-bold tracking-widest">
-              REQUEST LIMITS APPLY TO AI INFRASTRUCTURE
-            </p>
+            <p className="text-[9px] text-center text-muted-foreground/40 font-bold tracking-[0.2em] uppercase">Request Limits Apply Across Infrastructure</p>
           </div>
         </div>
       </main>

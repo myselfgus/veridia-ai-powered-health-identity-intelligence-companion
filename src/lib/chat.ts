@@ -1,4 +1,4 @@
-import type { Message, ChatState, ToolCall, WeatherResult, MCPResult, ErrorResult, SessionInfo } from '../../worker/types';
+import type { Message, ChatState, ToolCall, SessionInfo } from '../../worker/types';
 export interface ChatResponse {
   success: boolean;
   data?: ChatState;
@@ -13,14 +13,26 @@ class ChatService {
   private sessionId: string;
   private baseUrl: string;
   constructor() {
-    this.sessionId = crypto.randomUUID();
+    const saved = localStorage.getItem('veridia_session_id');
+    this.sessionId = saved || crypto.randomUUID();
+    if (!saved) localStorage.setItem('veridia_session_id', this.sessionId);
     this.baseUrl = `/api/chat/${this.sessionId}`;
   }
   private ensureBaseUrl() {
     if (!this.sessionId) {
-      this.sessionId = crypto.randomUUID();
+      const saved = localStorage.getItem('veridia_session_id');
+      this.sessionId = saved || crypto.randomUUID();
+      localStorage.setItem('veridia_session_id', this.sessionId);
     }
     this.baseUrl = `/api/chat/${this.sessionId}`;
+  }
+  async validateSession(): Promise<boolean> {
+    try {
+      const res = await fetch('/api/health');
+      return res.ok;
+    } catch {
+      return false;
+    }
   }
   async sendMessage(
     message: string,
@@ -35,7 +47,8 @@ class ChatService {
         body: JSON.stringify({ message, model, stream: !!onChunk }),
       });
       if (!response.ok) {
-        throw new Error(`HTTP ${response.status}`);
+        const errorData = await response.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP ${response.status}`);
       }
       if (onChunk && response.body) {
         const reader = response.body.getReader();
@@ -52,10 +65,14 @@ class ChatService {
         }
         return { success: true };
       }
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Invalid response format from server');
+      }
       return await response.json();
-    } catch (error) {
-      console.error('Failed to send message:', error);
-      return { success: false, error: 'Service unavailable' };
+    } catch (error: any) {
+      console.error('Failed to send message:', error?.message || String(error));
+      return { success: false, error: error?.message || 'Service unavailable' };
     }
   }
   async getMessages(): Promise<ChatResponse> {
@@ -63,10 +80,14 @@ class ChatService {
     try {
       const response = await fetch(`${this.baseUrl}/messages`);
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        throw new Error('Expected JSON response but received different format');
+      }
       return await response.json();
-    } catch (error) {
-      console.error('Failed to get messages:', error);
-      return { success: false, error: 'Failed to load history' };
+    } catch (error: any) {
+      console.error('Failed to get messages:', error?.message || String(error));
+      return { success: false, error: error?.message || 'Failed to load history' };
     }
   }
   async clearMessages(): Promise<ChatResponse> {
@@ -74,7 +95,8 @@ class ChatService {
     try {
       const response = await fetch(`${this.baseUrl}/clear`, { method: 'DELETE' });
       return await response.json();
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Failed to clear messages:', error?.message || String(error));
       return { success: false, error: 'Failed to clear session' };
     }
   }
@@ -83,10 +105,12 @@ class ChatService {
   }
   newSession(): void {
     this.sessionId = crypto.randomUUID();
+    localStorage.setItem('veridia_session_id', this.sessionId);
     this.baseUrl = `/api/chat/${this.sessionId}`;
   }
   switchSession(sessionId: string): void {
     this.sessionId = sessionId;
+    localStorage.setItem('veridia_session_id', this.sessionId);
     this.baseUrl = `/api/chat/${sessionId}`;
   }
   async createSession(title?: string, sessionId?: string, firstMessage?: string) {
@@ -97,7 +121,8 @@ class ChatService {
         body: JSON.stringify({ title, sessionId, firstMessage })
       });
       return await response.json();
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Failed to create session:', error?.message || String(error));
       return { success: false, error: 'Session creation failed' };
     }
   }
@@ -105,7 +130,8 @@ class ChatService {
     try {
       const response = await fetch('/api/sessions');
       return await response.json();
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Failed to list sessions:', error?.message || String(error));
       return { success: false, error: 'List sessions failed' };
     }
   }
@@ -113,7 +139,8 @@ class ChatService {
     try {
       const response = await fetch(`/api/sessions/${sessionId}`, { method: 'DELETE' });
       return await response.json();
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Failed to delete session:', error?.message || String(error));
       return { success: false };
     }
   }
@@ -126,7 +153,8 @@ class ChatService {
         body: JSON.stringify({ model })
       });
       return await response.json();
-    } catch (error) {
+    } catch (error: any) {
+      console.error('Failed to update model:', error?.message || String(error));
       return { success: false, error: 'Model switch failed' };
     }
   }
