@@ -6,8 +6,8 @@ export interface ChatResponse {
   detail?: string;
 }
 export const MODELS = [
-  { id: 'google-ai-studio/gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
-  { id: 'google-ai-studio/gemini-2.5-pro', name: 'Gemini 2.5 Pro' },
+  { id: 'google-ai-studio/gemini-1.5-flash', name: 'Gemini 1.5 Flash' },
+  { id: 'google-ai-studio/gemini-1.5-pro', name: 'Gemini 1.5 Pro' },
   { id: 'google-ai-studio/gemini-2.0-flash', name: 'Gemini 2.0 Flash' },
 ];
 class ChatService {
@@ -52,8 +52,8 @@ class ChatService {
       });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        return { 
-          success: false, 
+        return {
+          success: false,
           error: errorData.error || `Intelligence system returned ${response.status}`,
           detail: errorData.detail
         };
@@ -89,8 +89,8 @@ class ChatService {
       const response = await fetch(`${this.baseUrl}/messages`);
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        return { 
-          success: false, 
+        return {
+          success: false,
           error: errorData.error || 'Identity retrieval failed',
           detail: errorData.detail
         };

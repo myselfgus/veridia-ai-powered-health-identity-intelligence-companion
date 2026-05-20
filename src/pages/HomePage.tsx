@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Sparkles,
   User,
@@ -205,7 +205,7 @@ const Notification = ({ message, type, onClose }: { message: string, type: 'succ
     <motion.div
       initial={{ y: -50, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: -50, opacity: 0 }}
       className={cn(
-        "fixed top-6 left-1/2 -translate-x-1/2 z-[200] px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border backdrop-blur-md min-w-[300px]",
+        "fixed top-6 left-1/2 -translate-x-1/2 z-[250] px-6 py-3 rounded-full shadow-2xl flex items-center gap-3 border backdrop-blur-md min-w-[300px]",
         type === 'success' ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600 dark:text-emerald-400" :
         type === 'error' ? "bg-rose-500/10 border-rose-500/20 text-rose-600 dark:text-rose-400" :
         "bg-blue-500/10 border-blue-500/20 text-blue-600 dark:text-blue-400"
@@ -222,12 +222,30 @@ export function HomePage() {
   const [currentSessionId, setCurrentSessionId] = useState<string>(chatService.getSessionId());
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Mobile overlay
-  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // Desktop tri-state
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
   const [isMemoryOpen, setIsMemoryOpen] = useState(false);
   const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const showNotify = useCallback((message: string, type: 'success' | 'error' | 'info' = 'info') => {
+    setNotification({ message, type });
+  }, []);
+  const loadSessions = useCallback(async () => {
+    const res = await chatService.listSessions();
+    if (res.success && Array.isArray(res.data)) {
+      setSessions(res.data);
+    }
+  }, []);
+  const loadMessages = useCallback(async () => {
+    if (!currentSessionId) return;
+    const res = await chatService.getMessages();
+    if (res.success && res.data) {
+      setMessages(res.data.messages || []);
+    } else if (res.error) {
+      showNotify(res.error, 'error');
+    }
+  }, [currentSessionId, showNotify]);
   useEffect(() => {
     const init = async () => {
       await chatService.validateSession();
@@ -235,25 +253,10 @@ export function HomePage() {
       loadMessages();
     };
     init();
-  }, [currentSessionId]);
+  }, [currentSessionId, loadSessions, loadMessages]);
   useEffect(() => {
     if (scrollRef.current) scrollRef.current.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-  const showNotify = (message: string, type: 'success' | 'error' | 'info' = 'info') => setNotification({ message, type });
-  const loadSessions = async () => {
-    const res = await chatService.listSessions();
-    if (res.success && Array.isArray(res.data)) {
-      setSessions(res.data);
-    }
-  };
-  const loadMessages = async () => {
-    const res = await chatService.getMessages();
-    if (res.success && res.data) {
-      setMessages(res.data.messages || []);
-    } else if (res.error) {
-      showNotify(res.error, 'error');
-    }
-  };
   const handleSendMessage = async (e?: React.FormEvent, preset?: string) => {
     e?.preventDefault();
     const content = preset || input;
@@ -273,7 +276,9 @@ export function HomePage() {
         assistantContent += chunk;
         setMessages(prev => {
           const last = prev[prev.length - 1];
-          if (last?.id === 'temp-ai') return [...prev.slice(0, -1), { ...last, content: assistantContent }];
+          if (last?.id === 'temp-ai') {
+            return [...prev.slice(0, -1), { ...last, content: assistantContent }];
+          }
           return [...prev, { id: 'temp-ai', role: 'assistant', content: assistantContent, timestamp: Date.now() }];
         });
       });
