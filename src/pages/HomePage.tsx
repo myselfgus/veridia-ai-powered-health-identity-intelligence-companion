@@ -3,12 +3,12 @@ import {
   Sparkles,
   User,
   Database,
-  BookOpen,
   Send,
   Plus,
   Trash2,
   ShieldCheck,
   ChevronRight,
+  ChevronLeft,
   Menu,
   X,
   History,
@@ -17,8 +17,7 @@ import {
   Brain,
   AlertCircle,
   CheckCircle2,
-  Info,
-  Clock,
+  Thermometer,
   ClipboardList
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -30,7 +29,6 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Separator } from '@/components/ui/separator';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { cn } from '@/lib/utils';
 // --- Types ---
@@ -65,7 +63,7 @@ const PatientDashboardPanel = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
   <AnimatePresence>
     {isOpen && (
       <>
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           onClick={onClose}
           className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-[120]"
@@ -86,7 +84,7 @@ const PatientDashboardPanel = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
           </div>
           <ScrollArea className="flex-1 p-6">
             <div className="space-y-6">
-              <Card className="p-4 bg-gradient-to-br from-teal-500/10 to-blue-500/10 border-teal-500/20 rounded-3xl">
+              <Card className="p-4 bg-gradient-to-br from-teal-500/10 to-blue-500/10 border-teal-500/20 rounded-3xl shadow-none">
                 <div className="flex items-center gap-4 mb-4">
                   <Avatar className="h-12 w-12 border-2 border-white dark:border-slate-800 shadow-sm">
                     <AvatarFallback className="bg-teal-500 text-white font-bold">AS</AvatarFallback>
@@ -113,9 +111,9 @@ const PatientDashboardPanel = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
                   {[
                     { label: 'HR', val: DEMO_PATIENT.vitals.heartRate, icon: HeartPulse, color: 'text-rose-500' },
                     { label: 'BP', val: DEMO_PATIENT.vitals.bp, icon: Activity, color: 'text-teal-500' },
-                    { label: 'Temp', val: DEMO_PATIENT.vitals.temp, icon: ThermometerIcon, color: 'text-blue-500' }
+                    { label: 'Temp', val: DEMO_PATIENT.vitals.temp, icon: Thermometer, color: 'text-blue-500' }
                   ].map((v, i) => (
-                    <div key={i} className="p-3 rounded-2xl border border-border bg-slate-50 dark:bg-slate-900 flex flex-col items-center text-center">
+                    <div key={i} className="p-3 rounded-2xl border border-border bg-slate-50 dark:bg-slate-900 flex flex-col items-center text-center transition-all hover:bg-slate-100 dark:hover:bg-slate-800">
                       <v.icon className={cn("w-4 h-4 mb-2", v.color)} />
                       <span className="text-[10px] font-medium text-muted-foreground uppercase">{v.label}</span>
                       <span className="text-xs font-bold">{v.val}</span>
@@ -140,9 +138,6 @@ const PatientDashboardPanel = ({ isOpen, onClose }: { isOpen: boolean; onClose: 
     )}
   </AnimatePresence>
 );
-const ThermometerIcon = ({ className }: { className?: string }) => (
-  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="M14 4v10.54a4 4 0 1 1-4 0V4a2 2 0 0 1 4 0Z"/></svg>
-);
 // --- View 3: Memory Drive Panel ---
 const MemoryDrivePanel = ({ isOpen, onClose, messages }: { isOpen: boolean; onClose: () => void; messages: Message[] }) => {
   const records = messages.filter(m => m.role === 'assistant' && m.content.length > 50).slice(-5);
@@ -150,7 +145,7 @@ const MemoryDrivePanel = ({ isOpen, onClose, messages }: { isOpen: boolean; onCl
     <AnimatePresence>
       {isOpen && (
         <>
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
             onClick={onClose}
             className="fixed inset-0 bg-slate-950/40 backdrop-blur-sm z-[120]"
@@ -181,7 +176,7 @@ const MemoryDrivePanel = ({ isOpen, onClose, messages }: { isOpen: boolean; onCl
                 <div className="space-y-4">
                   <p className="text-xs text-muted-foreground mb-4">Veridia has indexed {records.length} key clinical insights from your session.</p>
                   {records.map((r, i) => (
-                    <Card key={i} className="p-4 border-border/60 hover:border-teal-500/40 transition-colors cursor-pointer group">
+                    <Card key={i} className="p-4 border-border/60 hover:border-teal-500/40 transition-colors cursor-pointer group shadow-none">
                       <div className="flex items-center justify-between mb-2">
                         <Badge variant="secondary" className="text-[10px] font-bold uppercase tracking-tighter bg-blue-500/5 text-blue-600">AI Summary</Badge>
                         <span className="text-[10px] text-muted-foreground font-medium">{formatTime(r.timestamp)}</span>
@@ -227,8 +222,8 @@ export function HomePage() {
   const [currentSessionId, setCurrentSessionId] = useState<string>(chatService.getSessionId());
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true); // Mobile overlay
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // Desktop tri-state
   const [isDashboardOpen, setIsDashboardOpen] = useState(false);
   const [isMemoryOpen, setIsMemoryOpen] = useState(false);
   const [notification, setNotification] = useState<{ message: string, type: 'success' | 'error' | 'info' } | null>(null);
@@ -247,11 +242,17 @@ export function HomePage() {
   const showNotify = (message: string, type: 'success' | 'error' | 'info' = 'info') => setNotification({ message, type });
   const loadSessions = async () => {
     const res = await chatService.listSessions();
-    if (res.success && Array.isArray(res.data)) setSessions(res.data);
+    if (res.success && Array.isArray(res.data)) {
+      setSessions(res.data);
+    }
   };
   const loadMessages = async () => {
     const res = await chatService.getMessages();
-    if (res.success && res.data) setMessages(res.data.messages || []);
+    if (res.success && res.data) {
+      setMessages(res.data.messages || []);
+    } else if (res.error) {
+      showNotify(res.error, 'error');
+    }
   };
   const handleSendMessage = async (e?: React.FormEvent, preset?: string) => {
     e?.preventDefault();
@@ -297,87 +298,131 @@ export function HomePage() {
       <PatientDashboardPanel isOpen={isDashboardOpen} onClose={() => setIsDashboardOpen(false)} />
       <MemoryDrivePanel isOpen={isMemoryOpen} onClose={() => setIsMemoryOpen(false)} messages={messages} />
       {/* --- Sidebar --- */}
-      <AnimatePresence>
+      <AnimatePresence mode="wait">
         {isSidebarOpen && (
           <motion.aside
-            initial={{ x: -300 }} animate={{ x: 0 }} exit={{ x: -300 }}
-            className="w-72 bg-white/50 dark:bg-slate-950/50 backdrop-blur-xl border-r border-border flex flex-col z-50 fixed md:static inset-y-0"
+            initial={{ x: -300 }}
+            animate={{ 
+              x: 0, 
+              width: isSidebarCollapsed ? 80 : 288 
+            }}
+            exit={{ x: -300 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 240 }}
+            className="bg-white/50 dark:bg-slate-950/50 backdrop-blur-xl border-r border-border flex flex-col z-50 fixed md:static inset-y-0 overflow-hidden"
           >
             <div className="p-6 flex-1 flex flex-col overflow-hidden">
-              <div className="flex items-center gap-3 mb-8">
-                <div className="w-10 h-10 rounded-2xl bg-teal-500 flex items-center justify-center shadow-lg shadow-teal-500/20">
+              <div className={cn("flex items-center gap-3 mb-8 transition-all", isSidebarCollapsed ? "justify-center" : "")}>
+                <div className="w-10 h-10 rounded-2xl bg-teal-500 flex items-center justify-center shrink-0 shadow-lg shadow-teal-500/20">
                   <ShieldCheck className="w-6 h-6 text-white" />
                 </div>
-                <div>
-                  <h1 className="font-bold text-lg tracking-tight">Veridia</h1>
-                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Clinical AI</p>
-                </div>
+                {!isSidebarCollapsed && (
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    <h1 className="font-bold text-lg tracking-tight">Veridia</h1>
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Clinical AI</p>
+                  </motion.div>
+                )}
               </div>
-              <Button onClick={handleNewChat} variant="outline" className="w-full gap-2 rounded-2xl py-6 mb-6 border-dashed border-2 hover:bg-accent/50">
-                <Plus className="w-4 h-4" /> New Consult
+              <Button 
+                onClick={handleNewChat} 
+                variant="outline" 
+                className={cn(
+                  "gap-2 rounded-2xl border-dashed border-2 hover:bg-accent/50 transition-all",
+                  isSidebarCollapsed ? "w-10 h-10 p-0 mx-auto" : "w-full py-6 mb-6"
+                )}
+              >
+                <Plus className="w-4 h-4" /> 
+                {!isSidebarCollapsed && "New Consult"}
               </Button>
               <div className="flex-1 overflow-hidden flex flex-col">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground px-2 mb-2">History</p>
+                <p className={cn(
+                  "text-[10px] font-bold uppercase tracking-widest text-muted-foreground mb-2 transition-all",
+                  isSidebarCollapsed ? "text-center opacity-0 h-0 overflow-hidden" : "px-2"
+                )}>
+                  History
+                </p>
                 <ScrollArea className="flex-1">
                   <div className="space-y-1">
                     {sessions.map(s => (
                       <button
                         key={s.id}
-                        onClick={() => { setCurrentSessionId(s.id); chatService.switchSession(s.id); }}
+                        onClick={() => { 
+                          setCurrentSessionId(s.id); 
+                          chatService.switchSession(s.id); 
+                        }}
                         className={cn(
-                          "w-full text-left px-3 py-2.5 rounded-xl text-xs transition-all flex items-center gap-3 group",
+                          "w-full text-left rounded-xl text-xs transition-all flex items-center group",
+                          isSidebarCollapsed ? "justify-center p-2.5" : "px-3 py-2.5 gap-3",
                           s.id === currentSessionId ? "bg-accent text-accent-foreground font-semibold" : "hover:bg-accent/40 text-muted-foreground"
                         )}
+                        title={isSidebarCollapsed ? s.title : ""}
                       >
                         <History className="w-3.5 h-3.5 shrink-0 opacity-50" />
-                        <span className="truncate flex-1">{s.title}</span>
+                        {!isSidebarCollapsed && <span className="truncate flex-1">{s.title}</span>}
                       </button>
                     ))}
                   </div>
                 </ScrollArea>
               </div>
             </div>
-            <div className="p-6 border-t border-border/40 space-y-4 bg-slate-50/50 dark:bg-slate-900/50">
-              <div className="flex items-center justify-between">
-                <div 
+            <div className={cn("p-6 border-t border-border/40 space-y-4 bg-slate-50/50 dark:bg-slate-900/50 transition-all", isSidebarCollapsed ? "flex flex-col items-center p-4" : "")}>
+              <div className={cn("flex items-center justify-between", isSidebarCollapsed ? "flex-col gap-4" : "")}>
+                <div
                   onClick={() => setIsDashboardOpen(true)}
-                  className="flex items-center gap-3 cursor-pointer hover:bg-white dark:hover:bg-slate-800 p-1 rounded-xl transition-all"
+                  className={cn(
+                    "flex items-center gap-3 cursor-pointer hover:bg-white dark:hover:bg-slate-800 p-1 rounded-xl transition-all",
+                    isSidebarCollapsed ? "justify-center" : ""
+                  )}
                 >
                   <Avatar className="h-8 w-8 ring-2 ring-teal-500/20">
                     <AvatarFallback className="bg-teal-500 text-white text-[10px] font-bold">AS</AvatarFallback>
                   </Avatar>
-                  <div className="flex flex-col">
-                    <span className="text-[11px] font-bold">Alex Sterling</span>
-                    <span className="text-[9px] text-teal-600 font-bold uppercase tracking-tighter">Verified ID</span>
-                  </div>
+                  {!isSidebarCollapsed && (
+                    <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex flex-col">
+                      <span className="text-[11px] font-bold">Alex Sterling</span>
+                      <span className="text-[9px] text-teal-600 font-bold uppercase tracking-tighter">Verified ID</span>
+                    </motion.div>
+                  )}
                 </div>
                 <ThemeToggle className="static" />
               </div>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} 
+                className="hidden md:flex rounded-full self-center"
+              >
+                {isSidebarCollapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
+              </Button>
             </div>
           </motion.aside>
         )}
       </AnimatePresence>
       {/* --- Main Area --- */}
-      <main className="flex-1 flex flex-col relative min-w-0">
+      <main className="flex-1 flex flex-col relative min-w-0 transition-all duration-300">
         <header className="h-16 border-b border-border/40 px-4 md:px-8 flex items-center justify-between bg-white/40 dark:bg-slate-950/40 backdrop-blur-md z-40">
           <div className="flex items-center gap-4">
-            <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="rounded-xl">
+            <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="md:hidden rounded-xl">
               <Menu className="w-5 h-5" />
             </Button>
+            {!isSidebarOpen && (
+              <Button variant="ghost" size="icon" onClick={() => setIsSidebarOpen(true)} className="hidden md:flex rounded-xl">
+                <Menu className="w-5 h-5" />
+              </Button>
+            )}
             <div className="hidden sm:flex flex-col">
               <h2 className="text-sm font-bold">Clinical Memory Active</h2>
               <div className="flex items-center gap-1.5">
                 <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">End-to-End Encrypted</span>
+                <span className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest">Secure Gateway</span>
               </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => setIsMemoryOpen(true)} className="rounded-full h-8 text-[11px] font-bold gap-1.5 bg-white dark:bg-slate-900">
+            <Button variant="outline" size="sm" onClick={() => setIsMemoryOpen(true)} className="rounded-full h-8 text-[11px] font-bold gap-1.5 bg-white dark:bg-slate-900 border-border/60">
               <Database className="w-3 h-3 text-teal-500" /> Drive
             </Button>
             <Badge variant="secondary" className="hidden lg:flex h-8 rounded-full border-border/40 bg-slate-100 dark:bg-slate-800 text-[10px] font-bold px-3">
-              V-SECURE 2.4.9
+              V-SECURE 2.5.0
             </Badge>
           </div>
         </header>
@@ -417,8 +462,8 @@ export function HomePage() {
                       <div className={cn("flex flex-col max-w-[85%] md:max-w-[75%]", m.role === 'user' ? "items-end" : "items-start")}>
                         <div className={cn(
                           "px-5 py-4 rounded-3xl text-sm leading-relaxed shadow-sm",
-                          m.role === 'user' 
-                            ? "bg-teal-600 text-white rounded-tr-none" 
+                          m.role === 'user'
+                            ? "bg-teal-600 text-white rounded-tr-none"
                             : "bg-white/60 dark:bg-slate-900/60 backdrop-blur-md border border-border/60 rounded-tl-none bg-gradient-to-br from-teal-500/5 to-blue-500/5"
                         )}>
                           {m.content}
@@ -450,12 +495,12 @@ export function HomePage() {
                 <Input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Ask Veridia about your clinical history..."
+                  placeholder="Ask Veridia about your health history..."
                   className="flex-1 bg-transparent border-none focus-visible:ring-0 text-sm h-12"
                   disabled={isLoading}
                 />
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   disabled={!input.trim() || isLoading}
                   className={cn("rounded-full h-12 w-12 transition-all", input.trim() ? "bg-teal-500 hover:bg-teal-600 shadow-lg shadow-teal-500/20" : "bg-muted")}
                 >
@@ -468,7 +513,7 @@ export function HomePage() {
               <div className="flex items-center gap-1.5 text-[9px] font-bold text-muted-foreground uppercase tracking-tighter"><Database className="w-3 h-3 text-blue-500" /> Memory Drive Linked</div>
               <div className="flex items-center gap-1.5 text-[9px] font-bold text-muted-foreground uppercase tracking-tighter"><Activity className="w-3 h-3 text-rose-500" /> Live Vital Sync</div>
             </div>
-            <p className="text-[9px] text-center text-muted-foreground/40 font-bold tracking-[0.2em] uppercase">Request Limits Apply Across Infrastructure</p>
+            <p className="text-[9px] text-center text-muted-foreground/40 font-bold tracking-[0.2em] uppercase">Note: Request limits apply across infrastructure</p>
           </div>
         </div>
       </main>

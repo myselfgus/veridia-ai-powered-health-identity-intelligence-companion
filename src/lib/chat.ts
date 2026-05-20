@@ -3,6 +3,7 @@ export interface ChatResponse {
   success: boolean;
   data?: ChatState;
   error?: string;
+  detail?: string;
 }
 export const MODELS = [
   { id: 'google-ai-studio/gemini-2.5-flash', name: 'Gemini 2.5 Flash' },
@@ -19,16 +20,19 @@ class ChatService {
     this.baseUrl = `/api/chat/${this.sessionId}`;
   }
   private ensureBaseUrl() {
-    if (!this.sessionId) {
+    if (!this.sessionId || this.sessionId.length < 8) {
       const saved = localStorage.getItem('veridia_session_id');
-      this.sessionId = saved || crypto.randomUUID();
+      this.sessionId = saved && saved.length >= 8 ? saved : crypto.randomUUID();
       localStorage.setItem('veridia_session_id', this.sessionId);
     }
     this.baseUrl = `/api/chat/${this.sessionId}`;
   }
   async validateSession(): Promise<boolean> {
     try {
-      const res = await fetch('/api/health');
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
+      const res = await fetch('/api/health', { signal: controller.signal });
+      clearTimeout(timeoutId);
       return res.ok;
     } catch {
       return false;
@@ -48,7 +52,11 @@ class ChatService {
       });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        return { 
+          success: false, 
+          error: errorData.error || `Intelligence system returned ${response.status}`,
+          detail: errorData.detail
+        };
       }
       if (onChunk && response.body) {
         const reader = response.body.getReader();
@@ -67,27 +75,34 @@ class ChatService {
       }
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('Invalid response format from server');
+        throw new Error('Unexpected non-JSON response from intelligence core');
       }
       return await response.json();
     } catch (error: any) {
-      console.error('Failed to send message:', error?.message || String(error));
-      return { success: false, error: error?.message || 'Service unavailable' };
+      console.error('Network failure in sendMessage:', error?.message || String(error));
+      return { success: false, error: 'Veridia gateway timed out' };
     }
   }
   async getMessages(): Promise<ChatResponse> {
     this.ensureBaseUrl();
     try {
       const response = await fetch(`${this.baseUrl}/messages`);
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}));
+        return { 
+          success: false, 
+          error: errorData.error || 'Identity retrieval failed',
+          detail: errorData.detail
+        };
+      }
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
-        throw new Error('Expected JSON response but received different format');
+        throw new Error('Retrieved identity context in invalid format');
       }
       return await response.json();
     } catch (error: any) {
-      console.error('Failed to get messages:', error?.message || String(error));
-      return { success: false, error: error?.message || 'Failed to load history' };
+      console.error('Network failure in getMessages:', error?.message || String(error));
+      return { success: false, error: 'Vault synchronization failed' };
     }
   }
   async clearMessages(): Promise<ChatResponse> {
@@ -96,8 +111,8 @@ class ChatService {
       const response = await fetch(`${this.baseUrl}/clear`, { method: 'DELETE' });
       return await response.json();
     } catch (error: any) {
-      console.error('Failed to clear messages:', error?.message || String(error));
-      return { success: false, error: 'Failed to clear session' };
+      console.error('Network failure in clearMessages:', error?.message || String(error));
+      return { success: false, error: 'Vault purge operation failed' };
     }
   }
   getSessionId(): string {
@@ -109,6 +124,7 @@ class ChatService {
     this.baseUrl = `/api/chat/${this.sessionId}`;
   }
   switchSession(sessionId: string): void {
+    if (!sessionId || sessionId.length < 8) return;
     this.sessionId = sessionId;
     localStorage.setItem('veridia_session_id', this.sessionId);
     this.baseUrl = `/api/chat/${sessionId}`;
@@ -122,8 +138,8 @@ class ChatService {
       });
       return await response.json();
     } catch (error: any) {
-      console.error('Failed to create session:', error?.message || String(error));
-      return { success: false, error: 'Session creation failed' };
+      console.error('Session creation network error:', error?.message || String(error));
+      return { success: false, error: 'Session allocation failed' };
     }
   }
   async listSessions(): Promise<{ success: boolean; data?: SessionInfo[]; error?: string }> {
@@ -131,8 +147,7 @@ class ChatService {
       const response = await fetch('/api/sessions');
       return await response.json();
     } catch (error: any) {
-      console.error('Failed to list sessions:', error?.message || String(error));
-      return { success: false, error: 'List sessions failed' };
+      return { success: false, error: 'Vault history unreachable' };
     }
   }
   async deleteSession(sessionId: string) {
@@ -140,7 +155,6 @@ class ChatService {
       const response = await fetch(`/api/sessions/${sessionId}`, { method: 'DELETE' });
       return await response.json();
     } catch (error: any) {
-      console.error('Failed to delete session:', error?.message || String(error));
       return { success: false };
     }
   }
@@ -154,25 +168,25 @@ class ChatService {
       });
       return await response.json();
     } catch (error: any) {
-      console.error('Failed to update model:', error?.message || String(error));
-      return { success: false, error: 'Model switch failed' };
+      return { success: false, error: 'Intelligence model switch failed' };
     }
   }
 }
 export const chatService = new ChatService();
 export const formatTime = (timestamp: number): string => {
+  if (!timestamp) return '--:--';
   return new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 };
 export const generateSessionTitle = (firstUserMessage?: string): string => {
   const now = new Date();
   const dateTime = now.toLocaleString([], { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
-  if (!firstUserMessage?.trim()) return `Consultation ${dateTime}`;
+  if (!firstUserMessage?.trim()) return `Consult ${dateTime}`;
   const truncated = firstUserMessage.trim().replace(/\s+/g, ' ').slice(0, 37);
   return `${truncated}${firstUserMessage.length > 37 ? '...' : ''} • ${dateTime}`;
 };
 export const renderToolCall = (toolCall: ToolCall): string => {
   const result = toolCall.result as any;
   if (!result) return `Task: ${toolCall.name}`;
-  if (result.error) return `Error in ${toolCall.name}`;
-  return `${toolCall.name} completed`;
+  if (result.error) return `Failure: ${toolCall.name}`;
+  return `${toolCall.name} complete`;
 };
