@@ -1,6 +1,6 @@
 # Cloudflare AI Chat Agent
 
-[cloudflarebutton]
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/myselfgus/veridia-ai-powered-health-identity-intelligence-companion)
 
 A production-ready full-stack template for building AI-powered chat applications using Cloudflare Workers, Durable Objects, and the Agents SDK. Features streaming responses, tool calling, session management, and a polished React frontend.
 
@@ -89,7 +89,7 @@ Add new tools in `worker/tools.ts` or integrate additional MCP servers in `worke
 
 ## Deployment
 
-[cloudflarebutton]
+[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/myselfgus/veridia-ai-powered-health-identity-intelligence-companion)
 
 Deploy to Cloudflare Workers with a single command:
 
